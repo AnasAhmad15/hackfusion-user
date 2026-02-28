@@ -35,6 +35,10 @@ import 'screens/language_selection_screen.dart';
 import 'screens/medicines_list_screen.dart';
 import 'screens/s2s_conversation_page.dart';
 import 'screens/app_tour_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'screens/admin_medicine_management.dart';
+import 'screens/admin_order_management.dart';
+import 'screens/admin_user_management.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -262,6 +266,10 @@ class _MyAppState extends State<MyApp> {
         '/app-tour': (context) => const AppTourScreen(),
         '/wallet': (context) => const WalletScreen(),
         '/health-profile': (context) => const HealthProfileScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardScreen(),
+        '/admin-medicines': (context) => const AdminMedicineManagement(),
+        '/admin-orders': (context) => const AdminOrderManagementScreen(),
+        '/admin-users': (context) => const AdminUserManagementScreen(),
       },
     );
   }
