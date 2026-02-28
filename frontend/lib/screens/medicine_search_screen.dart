@@ -164,20 +164,30 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
                 color: PharmacoTokens.neutral500,
               ),
             ),
-            trailing: SizedBox(
-              height: PharmacoTokens.buttonHeightSmall,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  _cartService.addToCart(medicine);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${medicine.name} added to cart'),
-                      behavior: SnackBarBehavior.floating,
+            trailing: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 100,
+              ),
+              child: SizedBox(
+                height: PharmacoTokens.buttonHeightSmall,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _cartService.addToCart(medicine);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${medicine.name} added to cart'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PharmacoTokens.space12,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add'),
+                  ),
+                  child: const Text('Add'),
+                ),
               ),
             ),
           ),

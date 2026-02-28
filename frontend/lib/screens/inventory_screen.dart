@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 import '../services/localization_service.dart';
 import 'package:intl/intl.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -262,15 +263,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   SizedBox(
                     height: 32,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _reorderMedicine(item),
-                      icon: const Icon(Icons.shopping_cart_outlined, size: 14),
-                      label: Text(LocalizationService.t('Reorder'), style: const TextStyle(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: PharmacoTokens.success,
-                        foregroundColor: PharmacoTokens.white,
-                        padding: const EdgeInsets.symmetric(horizontal: PharmacoTokens.space8),
-                        shape: RoundedRectangleBorder(borderRadius: PharmacoTokens.borderRadiusSmall),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: ElevatedButton(
+                        onPressed: () => _reorderMedicine(item),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: PharmacoTokens.success,
+                          foregroundColor: PharmacoTokens.white,
+                          padding: const EdgeInsets.symmetric(horizontal: PharmacoTokens.space8),
+                          shape: RoundedRectangleBorder(borderRadius: PharmacoTokens.borderRadiusSmall),
+                          minimumSize: Size.zero,
+                        ),
+                        child: Text(LocalizationService.t('Reorder'), style: const TextStyle(fontSize: 11)),
                       ),
                     ),
                   ),
@@ -370,7 +374,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       final imageUrl = _supabase.storage.from('prescriptions').getPublicUrl(filePath);
 
       final response = await http.post(
-        Uri.parse('http://192.168.137.1:8000/process_prescription_inventory'),
+        Uri.parse('${AppConfig.baseUrl}/process_prescription_inventory'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'user_id': userId, 'image_url': imageUrl}),
       ).timeout(const Duration(minutes: 3));
@@ -421,7 +425,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
       final userId = _supabase.auth.currentUser?.id;
       final response = await http.post(
-        Uri.parse('http://192.168.137.1:8000/extract_medicine_name'),
+        Uri.parse('${AppConfig.baseUrl}/extract_medicine_name'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'user_id': userId, 'ocr_text': rawOcrText}),
       );
@@ -534,6 +538,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   if (nameController.text.isEmpty || quantityController.text.isEmpty) return;
                   try {
                     final userId = _supabase.auth.currentUser?.id;
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
                     await _supabase.from('user_inventory').insert({
                       'user_id': userId,
                       'medicine_name': nameController.text,
@@ -542,9 +547,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       'expiry_date': selectedDate.toIso8601String().split('T')[0],
                       'added_from': source,
                     });
+                    
+                    if (!context.mounted) return;
                     Navigator.pop(context);
                     _fetchInventory();
+                    
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(content: Text(LocalizationService.t('Medicine added successfully')))
+                    );
                   } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 },

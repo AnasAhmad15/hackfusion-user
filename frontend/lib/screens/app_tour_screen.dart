@@ -101,7 +101,9 @@ class _AppTourScreenState extends State<AppTourScreen> {
                           Text(
                             LocalizationService.t(data['title'] as String),
                             textAlign: TextAlign.center,
-                            style: theme.textTheme.headlineLarge,
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              color: PharmacoTokens.neutral900,
+                            ),
                           ),
                           const SizedBox(height: PharmacoTokens.space16),
                           Text(
@@ -120,52 +122,67 @@ class _AppTourScreenState extends State<AppTourScreen> {
 
               // Bottom: dots + button
               Padding(
-                padding: const EdgeInsets.all(PharmacoTokens.space24),
+                padding: const EdgeInsets.fromLTRB(
+                  PharmacoTokens.space24,
+                  PharmacoTokens.space8,
+                  PharmacoTokens.space24,
+                  PharmacoTokens.space32,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Dots
-                    Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: List.generate(
-                          _tourData.length,
-                          (index) => AnimatedContainer(
-                            duration: PharmacoTokens.durationMedium,
-                            margin: const EdgeInsets.only(right: PharmacoTokens.space4),
-                            height: 8,
-                            width: _currentPage == index ? 24 : 8,
-                            decoration: BoxDecoration(
-                              color: _currentPage == index
-                                  ? PharmacoTokens.primaryBase
-                                  : PharmacoTokens.neutral300,
-                              borderRadius: PharmacoTokens.borderRadiusFull,
-                            ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        _tourData.length,
+                        (index) => AnimatedContainer(
+                          duration: PharmacoTokens.durationMedium,
+                          margin: const EdgeInsets.only(right: PharmacoTokens.space4),
+                          height: 8,
+                          width: _currentPage == index ? 24 : 8,
+                          decoration: BoxDecoration(
+                            color: _currentPage == index
+                                ? PharmacoTokens.primaryBase
+                                : PharmacoTokens.neutral300,
+                            borderRadius: PharmacoTokens.borderRadiusFull,
                           ),
                         ),
                       ),
                     ),
                     // Next / Get Started
-                    SizedBox(
-                      height: PharmacoTokens.buttonHeightRegular,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          if (_currentPage == _tourData.length - 1) {
-                            await LocalizationService.markTourSeen();
-                            if (context.mounted) {
-                              Navigator.pushReplacementNamed(context, '/home');
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 120,
+                        maxWidth: 160,
+                      ),
+                      child: SizedBox(
+                        height: PharmacoTokens.buttonHeightRegular,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: PharmacoTokens.space24,
+                            ),
+                          ),
+                          onPressed: () async {
+                            if (_currentPage == _tourData.length - 1) {
+                              await LocalizationService.markTourSeen();
+                              if (context.mounted) {
+                                Navigator.pushReplacementNamed(context, '/home');
+                              }
+                            } else {
+                              _pageController.nextPage(
+                                duration: PharmacoTokens.durationMedium,
+                                curve: PharmacoTokens.curveStandard,
+                              );
                             }
-                          } else {
-                            _pageController.nextPage(
-                              duration: PharmacoTokens.durationMedium,
-                              curve: PharmacoTokens.curveStandard,
-                            );
-                          }
-                        },
-                        child: Text(
-                          _currentPage == _tourData.length - 1
-                              ? LocalizationService.t('Get Started')
-                              : LocalizationService.t('Next'),
+                          },
+                          child: Text(
+                            _currentPage == _tourData.length - 1
+                                ? LocalizationService.t('Get Started')
+                                : LocalizationService.t('Next'),
+                          ),
                         ),
                       ),
                     ),

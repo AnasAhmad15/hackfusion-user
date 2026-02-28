@@ -158,8 +158,6 @@ class _HomeContentV2 extends StatelessWidget {
                     onTap: () =>
                         Navigator.pushNamed(context, '/medicine-search'),
                     readOnly: true,
-                    onMicTap: () =>
-                        Navigator.pushNamed(context, '/s2s-voice'),
                   ),
                 ),
 
@@ -496,7 +494,7 @@ class _FeaturedMedicines extends StatelessWidget {
           height: 180,
           child: StreamBuilder<List<Map<String, dynamic>>>(
             stream: Supabase.instance.client
-                .from('primary_medicines')
+                .from('medicines')
                 .stream(primaryKey: ['id'])
                 .limit(10),
             builder: (context, snapshot) {

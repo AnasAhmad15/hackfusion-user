@@ -1,8 +1,8 @@
 import os
 from typing import Optional, List
 from fastapi import FastAPI
-from pydantic import BaseModel as FastAPI_BaseModel, Field as FastAPI_Field
-from pydantic.v1 import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -75,6 +75,15 @@ supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # ------------------ FASTAPI ------------------
 app = FastAPI(title="PharmaCo AI Server")
+
+# Add CORS middleware to allow requests from the Flutter frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def home():
@@ -705,7 +714,6 @@ agent_with_chat_history = RunnableWithMessageHistory(
     history_messages_key="chat_history",
 )
 
-from pydantic.v1 import BaseModel, Field
 import json
 import httpx
 from datetime import datetime
@@ -715,13 +723,13 @@ import razorpay
 # Initialize Razorpay client
 razorpay_client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
 
-class PaymentItem(FastAPI_BaseModel):
+class PaymentItem(BaseModel):
     medicine_id: int
     name: str
     quantity: int
     price: float
 
-class OrderRequest(FastAPI_BaseModel):
+class OrderRequest(BaseModel):
     user_id: str
     payment_method: str
     reference_id: Optional[str] = None
@@ -862,7 +870,7 @@ async def topup_wallet(req: WalletTopupRequest):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-class ChatRequest(FastAPI_BaseModel):
+class ChatRequest(BaseModel):
     message: str
     user_id: str
     language: Optional[str] = "English"
@@ -914,7 +922,7 @@ async def translate_text(text: str, target_lang: str):
 
 # --- PYDANTIC MODELS ---
 
-class PrescriptionProcessRequest(FastAPI_BaseModel):
+class PrescriptionProcessRequest(BaseModel):
     user_id: str
     image_url: str
 
@@ -1022,7 +1030,7 @@ async def process_prescription_inventory(req: PrescriptionProcessRequest):
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
-class TabletScanRequest(FastAPI_BaseModel):
+class TabletScanRequest(BaseModel):
     user_id: str
     ocr_text: str
 
@@ -1145,7 +1153,7 @@ async def chat(req: ChatRequest):
         print(f"Chat Error: {e}")
         return {"reply": "I encountered a technical issue. Please try again."}
 
-class TTSRequest(FastAPI_BaseModel):
+class TTSRequest(BaseModel):
     text: str
     voice_id: Optional[str] = "21m00Tcm4TlvDq8ikWAM"
 

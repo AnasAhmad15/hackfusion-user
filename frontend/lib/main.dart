@@ -217,7 +217,7 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       theme: PharmacoTheme.lightTheme,
       darkTheme: PharmacoTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       initialRoute: initialRoute,
       onGenerateRoute: (settings) {
         if (settings.name == '/payment-success') {

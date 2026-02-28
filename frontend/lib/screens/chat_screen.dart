@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
+import '../theme/design_tokens.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/voice_service.dart';
 import 'package:animate_do/animate_do.dart';
@@ -88,7 +90,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.137.1:8000/chat'), // Replace with your backend URL
+        Uri.parse('${AppConfig.baseUrl}/chat'), // Centralized URL
         headers: {
           'Content-Type': 'application/json; charset=UTF-8',
         },
@@ -141,7 +143,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // Send to backend with the image URL
       final user = Supabase.instance.client.auth.currentUser;
       final response = await http.post(
-        Uri.parse('http://192.168.137.1:8000/chat'),
+        Uri.parse('${AppConfig.baseUrl}/chat'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode({
           'message': "I have uploaded my prescription. Here is the link: $url. Please process my order for the medicine we were discussing.",

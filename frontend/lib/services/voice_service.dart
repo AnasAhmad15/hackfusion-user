@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import '../config/app_config.dart';
 
 class ElevenLabsService {
   static const String _apiKey = "sk_2997fd7d3d9ef55025c8340f6ef27e91108bc3179bd92eec"; // Place your API key here
@@ -12,8 +13,8 @@ class ElevenLabsService {
 
   Future<void> speak(String text) async {
     try {
-      // Use the same server IP as chat_screen
-      final String baseUrl = 'http://192.168.137.1:8000';
+      // Use the centralized base URL
+      final String baseUrl = AppConfig.baseUrl;
       
       final response = await http.post(
         Uri.parse('$baseUrl/tts'),

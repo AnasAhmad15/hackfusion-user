@@ -142,18 +142,7 @@ class PharmacoSearchBar extends StatelessWidget {
             color: PharmacoTokens.neutral400,
             size: PharmacoTokens.iconMedium,
           ),
-          suffixIcon: onMicTap != null
-              ? IconButton(
-                  onPressed: onMicTap,
-                  icon: const Icon(Icons.mic_rounded),
-                  color: PharmacoTokens.primaryBase,
-                  iconSize: PharmacoTokens.iconMedium,
-                  constraints: const BoxConstraints(
-                    minWidth: PharmacoTokens.minTapTarget,
-                    minHeight: PharmacoTokens.minTapTarget,
-                  ),
-                )
-              : null,
+          suffixIcon: null,
         ),
       ),
     );

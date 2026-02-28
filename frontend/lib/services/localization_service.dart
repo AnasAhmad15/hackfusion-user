@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 import 'translations.dart';
 
 class LocalizationService {
-  static const String _baseUrl = 'http://192.168.137.1:8000'; // Updated to match user's current backend IP
+  static const String _baseUrl = AppConfig.baseUrl; // Centralized URL
   static String _currentLanguage = 'English';
   static final List<VoidCallback> _listeners = [];
   static const String _langKey = 'selected_language';

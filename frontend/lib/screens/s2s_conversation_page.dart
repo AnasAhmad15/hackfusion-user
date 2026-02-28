@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../config/app_config.dart';
 import '../services/voice_service.dart';
 import '../services/localization_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -160,7 +161,7 @@ class _S2SConversationPageState extends State<S2SConversationPage>
     try {
       final user = Supabase.instance.client.auth.currentUser;
       final response = await http.post(
-        Uri.parse('http://192.168.137.1:8000/chat'),
+        Uri.parse('${AppConfig.baseUrl}/chat'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode({
           'message': text,
@@ -218,7 +219,7 @@ class _S2SConversationPageState extends State<S2SConversationPage>
       final user = Supabase.instance.client.auth.currentUser;
 
       final response = await http.post(
-        Uri.parse('http://192.168.137.1:8000/chat'),
+        Uri.parse('${AppConfig.baseUrl}/chat'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode({
           'message': "I have uploaded my prescription. Here is the link: $url. Please confirm my order details.",
