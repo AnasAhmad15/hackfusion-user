@@ -196,16 +196,20 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.user != null) {
         final profile = await Supabase.instance.client
             .from('user_profiles')
-            .select('is_profile_complete')
+            .select('is_profile_complete, role')
             .eq('id', response.user!.id)
             .maybeSingle();
 
         final bool isComplete = profile?['is_profile_complete'] ?? false;
+        final String role = profile?['role'] ?? 'user';
 
         if (mounted) {
           await FCMService.initialize();
           await FCMService.sendWelcomeNotification('login');
-          if (isComplete) {
+
+          if (role == 'admin') {
+            Navigator.of(context).pushReplacementNamed('/admin-dashboard');
+          } else if (isComplete) {
             final bool tourSeen = await LocalizationService.isTourSeen();
             if (tourSeen) {
               Navigator.of(context).pushReplacementNamed('/home');

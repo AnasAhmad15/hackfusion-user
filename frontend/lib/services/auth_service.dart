@@ -46,6 +46,19 @@ class AuthService {
     }
   }
 
+  Future<String> getUserRole(String userId) async {
+    try {
+      final data = await _client
+          .from('user_profiles')
+          .select('role')
+          .eq('id', userId)
+          .single();
+      return data['role'] ?? 'user';
+    } catch (e) {
+      return 'user';
+    }
+  }
+
   Future<void> signOut() async {
     await _client.auth.signOut();
   }
