@@ -1,0 +1,201 @@
+{
+  "$schema": "https://schemas.tokens.studio/0.0.1/schema.json",
+  "name": "PharmaCo Design Tokens",
+  "version": "1.0.0",
+  "color": {
+    "primary": {
+      "base": "#246BFF",
+      "light": "#5A93FF",
+      "dark": "#1A4FCC",
+      "surface": "#EBF2FF",
+      "surfaceDark": "#0D1B3E"
+    },
+    "secondary": {
+      "base": "#00BFA5",
+      "light": "#5DF2D6",
+      "dark": "#008C7A",
+      "surface": "#E0F7F4"
+    },
+    "cta": {
+      "orange": "#FF8A3D",
+      "orangeLight": "#FFAB6E",
+      "orangeDark": "#E06E1F",
+      "green": "#00C853",
+      "greenLight": "#5EFC82",
+      "greenDark": "#009624"
+    },
+    "semantic": {
+      "success": "#16A34A",
+      "successLight": "#DCFCE7",
+      "error": "#EF4444",
+      "errorLight": "#FEE2E2",
+      "warning": "#F59E0B",
+      "warningLight": "#FEF3C7",
+      "info": "#3B82F6",
+      "infoLight": "#DBEAFE"
+    },
+    "neutral": {
+      "white": "#FFFFFF",
+      "50": "#F6F8FA",
+      "100": "#EEF1F5",
+      "200": "#E6EAF0",
+      "300": "#D1D5DB",
+      "400": "#9CA3AF",
+      "500": "#6B7280",
+      "600": "#4B5563",
+      "700": "#374151",
+      "800": "#1F2937",
+      "900": "#111827",
+      "black": "#333333"
+    },
+    "dark": {
+      "bg": "#0A1628",
+      "surface": "#111D32",
+      "surfaceElevated": "#1A2942",
+      "border": "#2A3A52"
+    },
+    "emergency": {
+      "base": "#DC2626",
+      "bg": "#FEF2F2"
+    }
+  },
+  "spacing": {
+    "base": 8,
+    "scale": [4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64],
+    "tokens": {
+      "space4": 4,
+      "space8": 8,
+      "space12": 12,
+      "space16": 16,
+      "space20": 20,
+      "space24": 24,
+      "space32": 32,
+      "space40": 40,
+      "space48": 48,
+      "space56": 56,
+      "space64": 64
+    }
+  },
+  "radii": {
+    "small": 8,
+    "medium": 16,
+    "card": 20,
+    "large": 28,
+    "full": 999
+  },
+  "elevation": {
+    "z0": 0,
+    "z1": 4,
+    "z2": 8,
+    "z3": 16
+  },
+  "typography": {
+    "fontFamily": "Inter",
+    "fontFamilyFallback": "Roboto",
+    "minAccessibleBodySize": 14,
+    "scale": {
+      "displayXl": {
+        "fontSize": 28,
+        "lineHeight": 34,
+        "fontWeight": 700,
+        "letterSpacing": -0.5
+      },
+      "h1": {
+        "fontSize": 22,
+        "lineHeight": 28,
+        "fontWeight": 600,
+        "letterSpacing": -0.25
+      },
+      "h2": {
+        "fontSize": 18,
+        "lineHeight": 22,
+        "fontWeight": 600,
+        "letterSpacing": 0
+      },
+      "bodyLarge": {
+        "fontSize": 16,
+        "lineHeight": 20,
+        "fontWeight": 500,
+        "letterSpacing": 0
+      },
+      "bodyRegular": {
+        "fontSize": 14,
+        "lineHeight": 18,
+        "fontWeight": 400,
+        "letterSpacing": 0
+      },
+      "caption": {
+        "fontSize": 12,
+        "lineHeight": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0
+      },
+      "overline": {
+        "fontSize": 10,
+        "lineHeight": 12,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      }
+    }
+  },
+  "animation": {
+    "durationFast": 120,
+    "durationMedium": 250,
+    "durationSlow": 400,
+    "durationSplash": 700,
+    "durationSpring": 300,
+    "durationShimmer": 1200,
+    "durationFlyToCart": 500,
+    "durationPressDown": 120,
+    "durationPressRelease": 180
+  },
+  "components": {
+    "button": {
+      "heightLarge": 52,
+      "heightRegular": 44,
+      "heightSmall": 36
+    },
+    "tapTarget": {
+      "min": 44
+    },
+    "fab": {
+      "size": 56,
+      "miniSize": 40
+    },
+    "bottomNav": {
+      "height": 80
+    },
+    "appBar": {
+      "height": 56
+    },
+    "input": {
+      "height": 48
+    },
+    "card": {
+      "minHeight": 72
+    },
+    "avatar": {
+      "small": 32,
+      "medium": 40,
+      "large": 56
+    },
+    "badge": {
+      "size": 18
+    },
+    "icon": {
+      "small": 16,
+      "medium": 24,
+      "large": 32,
+      "strokeWeight": 2
+    }
+  },
+  "responsive": {
+    "viewportMin": 320,
+    "viewportMax": 460
+  },
+  "glassmorphism": {
+    "blur": 12,
+    "opacity": 0.08,
+    "borderOpacity": 0.15
+  }
+}

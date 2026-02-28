@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "897407167967",
+    "project_id": "pharmaco-4776c",
+    "storage_bucket": "pharmaco-4776c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:897407167967:android:e5d887e8e0b966ffdc286a",
+        "android_client_info": {
+          "package_name": "com.example.pharmaco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIU8l1dPuRTlhr6D4Q5NOVYqsIzTWJ3bk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:897407167967:android:571b704b69ba82f4dc286a",
+        "android_client_info": {
+          "package_name": "com.example.pharmaco_delivery_partner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIU8l1dPuRTlhr6D4Q5NOVYqsIzTWJ3bk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:897407167967:android:c3bc24d0d4ff91fcdc286a",
+        "android_client_info": {
+          "package_name": "com.example.pharmaco_medical_partner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIU8l1dPuRTlhr6D4Q5NOVYqsIzTWJ3bk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
