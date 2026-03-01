@@ -51,7 +51,18 @@ class OrderService {
         }).toList(),
       };
 
-      await _client.from('orders').insert(orderData);
+      final response = await _client.from('orders').insert(orderData).select('id').single();
+      final orderId = response['id'];
+
+      // Send Order Placed Email in the background
+      try {
+        _client.functions.invoke(
+          'send-order-email',
+          body: {'order_id': orderId, 'type': 'new_order'},
+        ).catchError((e) => print('Email trigger background error: $e'));
+      } catch (e) {
+        print('Email trigger failed: $e');
+      }
 
       _cartService.clearCart();
     } catch (e) {

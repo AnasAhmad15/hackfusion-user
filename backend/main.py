@@ -585,6 +585,16 @@ def place_medicine_order(input_str: str) -> str:
             except Exception as e:
                 logger.error(f"FCM Notification failed: {str(e)}")
 
+        # 8. Trigger Email Notification
+        try:
+            email_func_url = f"{SUPABASE_URL}/functions/v1/send-order-email"
+            headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}", "Content-Type": "application/json"}
+            email_payload = {"order_id": order_uuid, "type": "new_order"}
+            with httpx.Client() as client:
+                client.post(email_func_url, json=email_payload, headers=headers)
+        except Exception as e:
+            logger.error(f"Email Notification failed: {str(e)}")
+
         return (f"Order placed successfully! Order ID: #{short_id}. "
                 f"Amount ₹{total_price} deducted from wallet. New balance: ₹{new_balance}. "
                 "You can view and track your order in the 'My Orders' section.")
@@ -861,6 +871,17 @@ async def place_order(req: OrderRequest):
             if med.data:
                 new_stock = max(0, int(med.data['stock']) - item.quantity)
                 supabase_admin.table("medicines").update({"stock": new_stock}).eq("id", item.medicine_id).execute()
+
+        # 4. Trigger Email Notification
+        try:
+            import httpx
+            email_func_url = f"{SUPABASE_URL}/functions/v1/send-order-email"
+            headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}", "Content-Type": "application/json"}
+            email_payload = {"order_id": order_id, "type": "new_order"}
+            with httpx.Client() as client:
+                client.post(email_func_url, json=email_payload, headers=headers)
+        except Exception as e:
+            print(f"Email Notification failed: {str(e)}")
 
         return {"success": True, "order_id": order_id}
 
