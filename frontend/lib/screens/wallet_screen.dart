@@ -284,7 +284,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         decoration: BoxDecoration(
                           color: isDeposit
                               ? PharmacoTokens.successLight
-                              : PharmacoTokens.emergencyBg,
+                              : PharmacoTokens.errorLight,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(

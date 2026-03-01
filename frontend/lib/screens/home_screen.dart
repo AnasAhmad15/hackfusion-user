@@ -135,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> {
     const HomeContent(),
     const MedicinesListScreen(),
     const ChatScreen(),
-    const EmergencyContactScreen(),
     const ProfileScreen(),
   ];
 
@@ -144,14 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F9),
       body: _pages[_selectedIndex],
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton(
-              onPressed: () => Navigator.pushNamed(context, '/emergency-mode'),
-              backgroundColor: Colors.redAccent,
-              heroTag: 'emergency_btn',
-              child: const Icon(Icons.emergency, color: Colors.white, size: 30),
-            )
-          : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         type: BottomNavigationBarType.fixed, // Added this line
@@ -164,7 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: const Icon(Icons.home_outlined), activeIcon: const Icon(Icons.home), label: t('Home')),
           BottomNavigationBarItem(icon: const Icon(Icons.medication_outlined), activeIcon: const Icon(Icons.medication), label: t('Medicines')),
           BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline), activeIcon: const Icon(Icons.chat_bubble), label: t('AI Chat')),
-          BottomNavigationBarItem(icon: const Icon(Icons.contact_emergency_outlined), activeIcon: const Icon(Icons.contact_emergency), label: t('Emergency')),
           BottomNavigationBarItem(icon: const Icon(Icons.person_outline), activeIcon: const Icon(Icons.person), label: t('Profile')),
         ],
       ),

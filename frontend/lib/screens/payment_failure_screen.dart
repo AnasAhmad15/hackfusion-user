@@ -24,8 +24,8 @@ class PaymentFailureScreen extends StatelessWidget {
             children: [
               Container(
                 width: 96, height: 96,
-                decoration: BoxDecoration(
-                  color: PharmacoTokens.emergencyBg,
+                decoration: const BoxDecoration(
+                  color: PharmacoTokens.errorLight,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.close_rounded, color: PharmacoTokens.error, size: 48),

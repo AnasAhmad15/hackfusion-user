@@ -5,6 +5,8 @@ import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
 import 'package:intl/intl.dart';
 
+import '../widgets/admin_drawer.dart';
+
 class AdminOrderManagementScreen extends StatefulWidget {
   const AdminOrderManagementScreen({Key? key}) : super(key: key);
 
@@ -45,7 +47,9 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
 
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
-      await _supabase.from('orders').update({'status': newStatus}).eq('id', orderId);
+      final response = await _supabase.from('orders').update({'status': newStatus}).eq('id', orderId).select();
+      if (response.isEmpty) throw 'No order updated';
+      
       _fetchOrders();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -53,6 +57,7 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
         );
       }
     } catch (e) {
+      debugPrint('Update Order Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error updating status: $e')),
@@ -67,6 +72,7 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
       appBar: AppBar(
         title: const Text('Manage Orders'),
       ),
+      drawer: const AdminDrawer(currentRoute: '/admin-orders'),
       body: _isLoading
           ? SkeletonLayouts.cardList()
           : _orders.isEmpty
@@ -109,7 +115,8 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
                           ),
                         ),
                         children: [
-                          Padding(
+                          Container(
+                            width: double.infinity,
                             padding: const EdgeInsets.all(16.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,9 +125,8 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
                                 ... (order['order_items'] as List).map((item) => Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('${item['name']} x ${item['quantity']}'),
+                                      Expanded(child: Text('${item['name']} x ${item['quantity']}')),
                                       Text('₹${item['price']}'),
                                     ],
                                   ),
@@ -128,27 +134,43 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
                                 const Divider(),
                                 Text('Address: ${order['delivery_address'] ?? 'No address'}'),
                                 const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    if (status == 'pending')
-                                      ElevatedButton(
-                                        onPressed: () => _updateOrderStatus(order['id'], 'preparing'),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                                        child: const Text('Accept'),
-                                      ),
-                                    if (status == 'preparing')
-                                      ElevatedButton(
-                                        onPressed: () => _updateOrderStatus(order['id'], 'ready'),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                                        child: const Text('Ready'),
-                                      ),
-                                    if (status != 'delivered' && status != 'cancelled' && status != 'completed')
-                                      TextButton(
-                                        onPressed: () => _updateOrderStatus(order['id'], 'cancelled'),
-                                        child: const Text('Cancel Order', style: TextStyle(color: Colors.red)),
-                                      ),
-                                  ],
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      if (status == 'pending')
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 8.0),
+                                          child: ElevatedButton(
+                                            onPressed: () => _updateOrderStatus(order['id'], 'preparing'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.blue, 
+                                              foregroundColor: Colors.white,
+                                              minimumSize: const Size(80, 36),
+                                            ),
+                                            child: const Text('Accept'),
+                                          ),
+                                        ),
+                                      if (status == 'preparing')
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 8.0),
+                                          child: ElevatedButton(
+                                            onPressed: () => _updateOrderStatus(order['id'], 'ready'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.orange, 
+                                              foregroundColor: Colors.white,
+                                              minimumSize: const Size(80, 36),
+                                            ),
+                                            child: const Text('Ready'),
+                                          ),
+                                        ),
+                                      if (status != 'delivered' && status != 'cancelled' && status != 'completed')
+                                        TextButton(
+                                          onPressed: () => _updateOrderStatus(order['id'], 'cancelled'),
+                                          child: const Text('Cancel Order', style: TextStyle(color: Colors.red)),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),

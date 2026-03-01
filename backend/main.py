@@ -9,6 +9,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools import tool, StructuredTool
@@ -109,8 +110,9 @@ llm = ChatOpenAI(
 
 @tool
 def check_medicine_inventory(input_str: str) -> str:
-    """Check if the user already has a medicine in their personal inventory/cabinet.
+    """Check the user's personal medicine inventory/cabinet.
     Input MUST be a JSON string: {"user_id": "...", "medicine_name": "..."}
+    To see EVERYTHING in their inventory, use "medicine_name": "all".
     """
     import json
     try:
@@ -124,21 +126,43 @@ def check_medicine_inventory(input_str: str) -> str:
             else:
                 data = json.loads(input_str)
         except:
-            return "Error: Input must be a JSON object with user_id and medicine_name."
+            # Fallback for raw string if it looks like a UUID
+            if len(input_str.strip()) > 30:
+                 data = {"user_id": input_str.strip(), "medicine_name": "all"}
+            else:
+                return "Error: Input must be a JSON object with user_id and medicine_name."
 
         user_id = data.get("user_id")
-        medicine_name = data.get("medicine_name")
+        medicine_name = data.get("medicine_name", "all")
         
-        if not user_id or not medicine_name:
-            return "Error: user_id and medicine_name are required."
+        if not user_id:
+            return "Error: user_id is required."
 
-        inventory = supabase_admin.table("user_inventory").select("*").eq("user_id", user_id).ilike("medicine_name", f"%{medicine_name}%").execute()
+        query = supabase_admin.table("user_inventory").select("*").eq("user_id", user_id)
         
-        if inventory.data:
-            item = inventory.data[0]
-            return f"You already have {item.get('quantity')} units of {item.get('medicine_name')} in your inventory."
-        return f"No {medicine_name} found in your personal inventory."
+        # If not "all", filter by name
+        if medicine_name.lower() != "all" and medicine_name.strip() != "":
+            query = query.ilike("medicine_name", f"%{medicine_name}%")
+            
+        inventory = query.execute()
+        
+        logger.info(f"Inventory Check: user={user_id}, query={medicine_name}, found={len(inventory.data) if inventory.data else 0}")
+
+        if not inventory.data:
+            if medicine_name.lower() == "all":
+                return "Your personal inventory is currently empty."
+            return f"No {medicine_name} found in your personal inventory."
+        
+        results = []
+        for item in inventory.data:
+            expiry = item.get('expiry_date', 'Not set')
+            daily = item.get('daily_usage', 'Not set')
+            results.append(f"- {item.get('medicine_name')}: {item.get('quantity')} units (Daily Use: {daily}, Expiry: {expiry})")
+            
+        header = "Your Personal Inventory:\n" if medicine_name.lower() == "all" else f"Inventory matches for '{medicine_name}':\n"
+        return header + "\n".join(results)
     except Exception as e:
+        logger.error(f"Inventory Tool Error: {e}")
         return f"Error checking inventory: {str(e)}"
 
 @tool
@@ -233,101 +257,92 @@ def get_user_profile(user_id: str) -> str:
         return f"Error fetching profile: {str(e)}"
 
 @tool
-def update_user_health_profile(input_str: str) -> str:
-    """Update fields in the user's health profile.
-    Input MUST be a JSON string: {"user_id": "...", "update_data": {"age": 25, "allergies": ["Peanuts"]}}
-    """
-    import json
-    try:
-        data = json.loads(input_str)
-        user_id = data.get("user_id")
-        update_data = data.get("update_data")
-        
-        if not user_id or not update_data:
-            return "Error: user_id and update_data are required in JSON."
-
-        res = supabase_admin.table("user_profiles").update(update_data).eq("id", user_id).execute()
-        if hasattr(res, 'data') and res.data:
-            return f"Successfully updated your health profile: {', '.join(update_data.keys())}."
-        return "Profile update failed. Make sure the User ID is correct."
-    except Exception as e:
-        return f"Error updating profile: {str(e)}"
-
-@tool
 def suggest_generic_substitutes(medicine_name: str) -> str:
     """Suggest affordable generic alternatives for a branded medicine.
+    This should be used when a medicine is out of stock or specifically requested.
     Input should be the branded medicine name.
     """
     try:
+        # 1. Try database first
         response = supabase_admin.table("primary_medicines").select("name,brand,description,price").ilike("name", f"%{medicine_name}%").execute()
-        if response.data:
+        
+        if response.data and len(response.data) > 0:
             results = []
             for med in response.data:
                 results.append(f"Substitute: {med['name']}\nBrand: {med['brand']}\nPrice: ₹{med['price']}\nInfo: {med['description']}")
-            return "Generic Substitutes Found:\n\n" + "\n\n".join(results)
-        return f"No specific generic substitutes found for '{medicine_name}'."
+            return "MATCHES_FOUND: I found these matches in our database which are available for order:\n\n" + "\n\n".join(results)
+        
+        # 2. LLM Fallback if no database match
+        logger.info(f"No DB match for substitute '{medicine_name}'. Using LLM fallback.")
+        
+        fallback_prompt = f"Suggest 1-2 popular generic salt/alternatives for the branded medicine '{medicine_name}'. For each, provide: 1. Generic Name, 2. Common use, 3. Why it is a good alternative. Keep it professional and concise for a health assistant."
+        
+        messages = [
+            SystemMessage(content="You are a helpful medical assistant specializing in generic medicine substitutes."),
+            HumanMessage(content=fallback_prompt)
+        ]
+        
+        ai_res = llm.invoke(messages)
+        return f"NO_STORE_MATCH: I couldn't find a direct match in our inventory, but here are some common generic alternatives for {medicine_name} that you can discuss with your doctor (Note: These are NOT currently in our stock):\n\n{ai_res.content}\n\nNote: Please consult a healthcare professional before switching medications."
+
     except Exception as e:
+        logger.error(f"Substitute Tool Error: {e}")
         return f"Error suggesting substitutes: {str(e)}"
 
 @tool
-def set_medicine_reminder(input_str: str) -> str:
-    """Set a medication reminder.
-    Input MUST be a JSON string: {"user_id": "...", "medicine_name": "...", "dosage": "...", "schedule_time": "HH:MM"}
+def remove_from_cart(input_str: str) -> str:
+    """Remove a specific medicine from the user's shopping cart.
+    Input MUST be a JSON string: {"user_id": "...", "medicine_name": "..."}
     """
     import json
     try:
-        data = json.loads(input_str)
+        data = {}
+        try:
+            start = input_str.find('{')
+            end = input_str.rfind('}')
+            if start != -1 and end != -1:
+                data = json.loads(input_str[start:end+1])
+            else:
+                data = json.loads(input_str)
+        except:
+             return "Error: Input must be a JSON object with user_id and medicine_name."
+
         user_id = data.get("user_id")
         medicine_name = data.get("medicine_name")
-        dosage = data.get("dosage")
-        schedule_time = data.get("schedule_time")
-        
-        if not all([user_id, medicine_name, dosage, schedule_time]):
-            return "Error: Missing required fields (user_id, medicine_name, dosage, schedule_time)."
 
-        reminder_data = {
-            "user_id": user_id,
-            "medicine_name": medicine_name,
-            "dosage": dosage,
-            "schedule_time": schedule_time,
-            "is_active": True
-        }
-        res = supabase_admin.table("medicine_reminders").insert(reminder_data).execute()
-        if hasattr(res, 'data') and res.data:
-            return f"Reminder set successfully for {medicine_name} at {schedule_time}."
-        return "Failed to set reminder."
+        if not user_id or not medicine_name:
+            return "Error: user_id and medicine_name are required."
+
+        # 1. Resolve medicine ID
+        med_res = supabase_admin.rpc("search_medicines", {"search_term": medicine_name}).execute()
+        if not med_res.data:
+            return f"Could not find medicine '{medicine_name}' in our database."
+        
+        medicine = med_res.data[0]
+        med_id = medicine['id']
+
+        # 2. Delete from cart
+        res = supabase_admin.table("cart").delete().eq("user_id", user_id).eq("medicine_id", med_id).execute()
+        
+        if res.data:
+            return f"Successfully removed '{medicine['name']}' from your cart."
+        return f"'{medicine['name']}' was not found in your cart."
     except Exception as e:
-        return f"Error setting reminder: {str(e)}"
+        logger.error(f"Remove from cart error: {e}")
+        return f"Error removing from cart: {str(e)}"
 
 @tool
-def predict_refill_needs(user_id: str) -> str:
-    """Predict when user will run out of medicines.
+def clear_cart(user_id: str) -> str:
+    """Clear all items from the user's shopping cart.
     Argument: user_id (string UUID)
     """
     try:
-        # Clean user_id
-        user_id = user_id.strip("'\" {}")
-        if ":" in user_id:
-            import json
-            try: user_id = json.loads(user_id).get("user_id", user_id)
-            except: pass
-
-        inventory = supabase_admin.table("user_inventory").select("*").eq("user_id", user_id).execute()
-        if not inventory.data:
-            return "No medicines found in your inventory to predict refills."
-        predictions = []
-        for item in inventory.data:
-            stock = item.get('quantity', 0)
-            daily_usage = item.get('daily_usage', 1.0)
-            if daily_usage > 0:
-                days_left = int(stock / daily_usage)
-                status = "STABLE"
-                if days_left <= 3: status = "CRITICAL REFILL"
-                elif days_left <= 7: status = "REFILL SOON"
-                predictions.append(f"Medicine: {item['medicine_name']}\nDays Remaining: {days_left}\nStatus: {status}")
-        return "Refill Predictions:\n\n" + "\n\n".join(predictions)
+        user_id = clean_input_string(user_id, "user_id")
+        res = supabase_admin.table("cart").delete().eq("user_id", user_id).execute()
+        return "Your cart has been successfully cleared."
     except Exception as e:
-        return f"Error predicting refills: {str(e)}"
+        logger.error(f"Clear cart error: {e}")
+        return f"Error clearing cart: {str(e)}"
 
 @tool
 def add_medicine_to_cart(input_str: str) -> str:
@@ -358,15 +373,21 @@ def add_medicine_to_cart(input_str: str) -> str:
         # 1. Resolve medicine ID
         med_res = supabase_admin.rpc("search_medicines", {"search_term": medicine_name}).execute()
         if not med_res.data:
-            return f"Could not find medicine '{medicine_name}' to add to cart."
+            # Fallback to substitute search if not found in main inventory
+            sub_info = suggest_generic_substitutes(medicine_name)
+            return f"Could not find medicine '{medicine_name}'. {sub_info}"
         
         medicine = med_res.data[0]
+        if medicine.get('stock', 0) <= 0:
+            sub_info = suggest_generic_substitutes(medicine_name)
+            return f"'{medicine['name']}' is currently out of stock. {sub_info}"
+        
         med_id = medicine['id']
 
         # 2. Check if already in cart
         cart_res = supabase_admin.table("cart").select("*").eq("user_id", user_id).eq("medicine_id", med_id).execute()
         
-        if cart_res.data:
+        if cart_res.data and len(cart_res.data) > 0:
             # Update quantity
             old_qty = cart_res.data[0]['quantity']
             new_qty = old_qty + quantity
@@ -382,6 +403,7 @@ def add_medicine_to_cart(input_str: str) -> str:
             return f"Successfully added {quantity} units of '{medicine['name']}' to your cart."
 
     except Exception as e:
+        logger.error(f"Add to cart error: {e}")
         return f"Error adding to cart: {str(e)}"
 
 @tool
@@ -432,7 +454,8 @@ def place_medicine_order(input_str: str) -> str:
         # 1. Verify medicine exists and check prescription requirement
         med_res = supabase_admin.rpc("search_medicines", {"search_term": medicine_name}).execute()
         if not hasattr(med_res, 'data') or not med_res.data:
-            return f"Medicine '{medicine_name}' not found or out of stock."
+            sub_info = suggest_generic_substitutes(medicine_name)
+            return f"Medicine '{medicine_name}' not found or out of stock. {sub_info}"
         
         # Exact match logic to prevent ordering wrong variant
         medicine = med_res.data[0]
@@ -441,11 +464,12 @@ def place_medicine_order(input_str: str) -> str:
                 medicine = m
                 break
 
+        if medicine.get('stock', 0) < quantity:
+            sub_info = suggest_generic_substitutes(medicine_name)
+            return f"Insufficient stock. Only {medicine.get('stock', 0)} units of {medicine['name']} are available. {sub_info}"
+        
         if medicine.get('prescription_required') and not prescription_url:
             return f"Error: '{medicine['name']}' requires a prescription. Please upload one before ordering."
-
-        if medicine.get('stock', 0) < quantity:
-            return f"Insufficient stock. Only {medicine.get('stock', 0)} units of {medicine['name']} are available."
 
         # 2. Fetch User Profile for details, address and balance
         profile_res = supabase_admin.table("user_profiles").select("full_name, age, gender, wallet_balance, fcm_token, address").eq("id", user_id).single().execute()
@@ -572,16 +596,16 @@ tools = [
     check_medicine_inventory,
     get_medicine_details,
     get_user_profile,
-    update_user_health_profile,
     suggest_generic_substitutes,
-    set_medicine_reminder,
-    predict_refill_needs,
     place_medicine_order,
-    add_medicine_to_cart
+    add_medicine_to_cart,
+    remove_from_cart,
+    clear_cart
 ]
 
 # ------------------ REACT AGENT ------------------
-react_system_prompt = """You are the PharmaCo Assistant, a medical AI.
+react_system_prompt = """You are PharmaVoice AI, a highly empathetic and professional human-like health assistant.
+Your goal is to have a natural, helpful conversation with the user.
 You have access to tools to help the user with their health, medicine, and profile.
 
 TOOLS:
@@ -623,16 +647,42 @@ ORDER FLOW & LOGIC:
       - Once 'Prescription' is an image URL (not 'None'), proceed to ask for quantity and confirmation.
       - Call 'place_medicine_order' and ensure 'prescription_url' is passed.
 
-2. Personal Inventory & User Details:
-   - If the user asks "What medicines do I have?" or "Check my stock", call 'check_medicine_inventory' or 'predict_refill_needs'.
-   - If the user asks about their own details (allergies, address, wallet), call 'get_user_profile'.
+INVENTORY LOGIC:
+---------------
+1. When asked to "check my inventory" or "what do I have?":
+   - If they specify a medicine (e.g., "Do I have Crocin?"), call 'check_medicine_inventory' with that name.
+   - If they don't specify a name or just say "show my inventory", call 'check_medicine_inventory' with "medicine_name": "all".
+   - If a specific search returns nothing, inform the user but also offer to show their ENTIRE inventory by calling the tool with "all".
+
+SUBSTITUTE LOGIC:
+----------------
+1. If a medicine is OUT OF STOCK or NOT FOUND, call 'suggest_generic_substitutes'.
+2. If the tool response starts with 'MATCHES_FOUND':
+   - Inform the user these ARE available in our store.
+   - You MAY offer to add them to the cart or place an order.
+3. If the tool response starts with 'NO_STORE_MATCH':
+   - Inform the user these are general medical suggestions only.
+   - CRITICAL: Do NOT offer to order or add these to the cart, as they are not in our database.
+4. Always include the medical consultation disclaimer.
+
+CART MANAGEMENT LOGIC:
+----------------------
+1. If the user wants to add an item to the cart: Use 'add_medicine_to_cart'.
+2. If the user wants to remove an item (e.g., "Remove Crocin from my cart"): Use 'remove_from_cart'.
+3. If the user wants to empty or clear their cart: Use 'clear_cart'.
+4. After any cart action, confirm the result to the user.
+
+Guidelines for Human-like Conversation:
+1. Address the user by their name when appropriate.
+2. Be empathetic and supportive. If they mention being sick or needing medicine, show concern.
+3. Avoid sounding like a robot. Use natural transitions and varied sentence structures.
+4. Keep responses concise but warm—perfect for voice interaction.
 
 CRITICAL INSTRUCTIONS:
 1. Always respond in the SAME LANGUAGE as the user (Hindi, Spanish, etc.).
 2. ADDRESS PRIORITY: ALWAYS fetch delivery address from 'get_user_profile' and use it automatically for orders.
 3. NO HALLUCINATED WAITING: NEVER say "Wait a moment" or "Processing" in your Final Answer.
 4. DO NOT mention stock or specific medical store names unless explicitly asked.
-5. If the user asks for their details, use 'get_user_profile'.
 
 Current Context:
 User ID: {user_id}
@@ -875,6 +925,80 @@ class ChatRequest(BaseModel):
     user_id: str
     language: Optional[str] = "English"
     image_url: Optional[str] = None
+    extracted_medicines: Optional[List[str]] = None
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    try:
+        # 1. Process Extracted Medicines if provided (Auto-add to cart)
+        auto_cart_msg = ""
+        if req.extracted_medicines:
+            for med_name in req.extracted_medicines:
+                med_res = supabase_admin.table("medicines").select("*").ilike("name", f"%{med_name}%").limit(1).execute()
+                if med_res.data and len(med_res.data) > 0:
+                    med = med_res.data[0]
+                    existing = supabase_admin.table("cart").select("*").eq("user_id", req.user_id).eq("medicine_id", med["id"]).execute()
+                    if not (existing.data and len(existing.data) > 0):
+                        supabase_admin.table("cart").insert({
+                            "user_id": req.user_id,
+                            "medicine_id": med["id"],
+                            "quantity": med.get("min_order_quantity", 1)
+                        }).execute()
+                        auto_cart_msg += f"- {med['name']} added to cart.\n"
+                    else:
+                        auto_cart_msg += f"- {med['name']} is already in your cart.\n"
+
+        # 2. Execute agent with proper session history and context
+        # We pass additional context in the input string for the ReAct agent
+        input_with_context = f"{req.message}\n\nContext:\nUser ID: {req.user_id}\nLanguage: {req.language}\nPrescription Image: {req.image_url or 'None'}\n{f'Auto-added to cart: {auto_cart_msg}' if auto_cart_msg else ''}"
+        
+        response = agent_with_chat_history.invoke(
+            {
+                "input": input_with_context,
+                "user_id": req.user_id,
+                "language": req.language,
+                "image_url": req.image_url or "None"
+            },
+            config={"configurable": {"session_id": req.user_id}},
+        )
+        
+        output = response.get('output', "I'm sorry, I couldn't process that.")
+        
+        # 3. Robust detection: check if any tool result explicitly mentioned prescription requirement
+        require_prescription = False
+        try:
+            isteps = response.get("intermediate_steps", [])
+            for action, observation in isteps:
+                obs_str = str(observation).upper()
+                if "PRESCRIPTION: REQUIRED" in obs_str or "PRESCRIPTION REQUIRED: YES" in obs_str:
+                    require_prescription = True
+                    break
+                elif "PRESCRIPTION: NOT REQUIRED" in obs_str or "PRESCRIPTION REQUIRED: NO" in obs_str:
+                    require_prescription = False
+        except:
+            pass
+
+        if not require_prescription:
+            o_lower = output.lower()
+            has_presc_word = "prescription" in o_lower or "प्रिस्क्रिप्शन" in o_lower
+            is_asking_to_upload = any(w in o_lower for w in ["upload", "अपलोड", "send", "भेजें"])
+            is_saying_required = any(w in o_lower for w in ["required", "आवश्यक", "needed", "चाहिए"])
+            not_required = any(phrase in o_lower for phrase in ["not required", "no prescription", "आवश्यकता नहीं", "बिना प्रिस्क्रिप्शन"])
+            
+            if has_presc_word and (is_asking_to_upload or is_saying_required) and not not_required:
+                require_prescription = True
+        
+        clean_output = output.replace("**", "")
+        return {
+            "reply": clean_output, 
+            "require_prescription": require_prescription,
+            "should_exit": "goodbye" in clean_output.lower() or "thank you" in clean_output.lower()
+        }
+    except Exception as e:
+        print(f"Chat Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"reply": "I encountered a technical issue. Please try again.", "should_exit": False}
 
 @app.post("/translate_batch")
 async def translate_batch(texts: List[str], target_lang: str):
@@ -925,6 +1049,88 @@ async def translate_text(text: str, target_lang: str):
 class PrescriptionProcessRequest(BaseModel):
     user_id: str
     image_url: str
+    cart_items: Optional[List[str]] = None
+
+@app.post("/validate_prescription_cart")
+async def validate_prescription_cart(req: PrescriptionProcessRequest):
+    """
+    Processes a prescription image using PrescriptoAI and validates it against cart items.
+    Returns which cart items are present in the prescription.
+    """
+    try:
+        # 1. Download image
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            img_response = await client.get(req.image_url)
+            if img_response.status_code != 200:
+                return {"success": False, "error": "Failed to download image"}
+            image_content = img_response.content
+
+        # 2. Call PrescriptoAI
+        async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+            api_url = "https://www.prescriptoai.com/api/v1/prescription/extract"
+            files = {'prescription': ('prescription.jpg', image_content, 'image/jpeg')}
+            headers = {"Authorization": f"Bearer {PRESCRIPTO_API_KEY}", "Accept": "application/json"}
+            
+            response = await client.post(api_url, headers=headers, files=files)
+            
+            if response.status_code != 200:
+                error_msg = f"AI Error ({response.status_code})"
+                if response.status_code == 503:
+                    error_msg = "Prescription AI service is temporarily busy. Please try again."
+                elif response.status_code == 400:
+                    error_msg = "Invalid image. Please upload a clear photo of a real prescription."
+                
+                # Check if the response contains a more specific error message from the API
+                try:
+                    api_error = response.json()
+                    if api_error.get("error"):
+                        error_msg = api_error["error"]
+                except:
+                    pass
+                    
+                return {"success": False, "error": error_msg}
+            
+            result = response.json()
+            print(f"DEBUG: validate_prescription_cart - PrescriptoAI Full Response: {json.dumps(result, indent=2)}")
+            data_obj = result.get("data", {})
+            prescription_obj = data_obj.get("prescription", {})
+            medications = prescription_obj.get("medications", [])
+            
+            if not medications:
+                return {
+                    "success": False, 
+                    "error": "No medicines detected. Please ensure you uploaded a valid prescription."
+                }
+            
+            extracted_names = [m.get("name", "").lower() for m in medications if m.get("name")]
+            
+            # 3. Match with cart items if provided
+            validated_items = []
+            missing_items = []
+            
+            if req.cart_items:
+                for item in req.cart_items:
+                    item_lower = item.lower()
+                    # Simple fuzzy matching: check if cart item name exists in extracted names or vice versa
+                    matched = any(item_lower in extracted or extracted in item_lower for extracted in extracted_names)
+                    if matched:
+                        validated_items.append(item)
+                    else:
+                        missing_items.append(item)
+
+            return {
+                "success": True,
+                "extracted_medicines": extracted_names,
+                "validated_items": validated_items,
+                "missing_items": missing_items,
+                "prescription_details": {
+                    "doctor": prescription_obj.get("doctor_name"),
+                    "date": prescription_obj.get("date"),
+                    "diagnosis": prescription_obj.get("diagnosis")
+                }
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/process_prescription_inventory")
 async def process_prescription_inventory(req: PrescriptionProcessRequest):
@@ -1148,7 +1354,19 @@ async def chat(req: ChatRequest):
         
         # Clean markdown bolding characters as requested
         clean_output = output.replace("**", "")
-        return {"reply": clean_output, "require_prescription": require_prescription}
+        
+        # Intelligent Exit Detection
+        should_exit = False
+        exit_keywords = ["bye", "goodbye", "exit", "quit", "leave", "नमस्ते", "अलविदा", "फिर मिलेंगे"]
+        o_lower = output.lower()
+        if any(word in o_lower for word in exit_keywords) and len(o_lower.split()) < 15:
+            should_exit = True
+
+        return {
+            "reply": clean_output, 
+            "require_prescription": require_prescription,
+            "should_exit": should_exit
+        }
     except Exception as e:
         print(f"Chat Error: {e}")
         return {"reply": "I encountered a technical issue. Please try again."}
@@ -1161,7 +1379,7 @@ class TTSRequest(BaseModel):
 async def text_to_speech(req: TTSRequest):
     """Securely proxy TTS requests to ElevenLabs with quota detection."""
     try:
-        eleven_labs_key = os.getenv("ELEVENLABS_API_KEY", "sk_745af9f4c87e29b7c1d27e41217d31dac91631f52f54b5a0")
+        eleven_labs_key = os.getenv("ELEVENLABS_API_KEY", "sk_1cd61d73a491e8a2de10f920fadead492d765bb08ec96ce7")
         api_url = f"https://api.elevenlabs.io/v1/text-to-speech/{req.voice_id}"
         
         headers = {

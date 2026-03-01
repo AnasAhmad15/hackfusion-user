@@ -4,6 +4,8 @@ import '../theme/design_tokens.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
 
+import '../widgets/admin_drawer.dart';
+
 class AdminMedicineManagement extends StatefulWidget {
   const AdminMedicineManagement({Key? key}) : super(key: key);
 
@@ -121,6 +123,7 @@ class _AdminMedicineManagementState extends State<AdminMedicineManagement> {
       appBar: AppBar(
         title: const Text('Manage Inventory'),
       ),
+      drawer: const AdminDrawer(currentRoute: '/admin-medicines'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddEditMedicineDialog(),
         backgroundColor: PharmacoTokens.primaryBase,

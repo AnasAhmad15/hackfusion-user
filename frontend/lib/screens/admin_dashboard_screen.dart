@@ -5,6 +5,8 @@ import '../services/localization_service.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
 
+import '../widgets/admin_drawer.dart';
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
 
@@ -55,16 +57,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Panel'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () async {
-              await _supabase.auth.signOut();
-              if (mounted) Navigator.of(context).pushReplacementNamed('/login');
-            },
-          ),
-        ],
       ),
+      drawer: const AdminDrawer(currentRoute: '/admin-dashboard'),
       body: _isLoading
           ? Padding(
               padding: const EdgeInsets.all(PharmacoTokens.space16),

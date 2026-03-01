@@ -25,6 +25,7 @@ class _S2SConversationPageState extends State<S2SConversationPage>
 
   bool _isListening = false;
   bool _isProcessing = false;
+  bool _isAutoMode = false;
   String _lastWords = "";
   String _statusText = "Tap the mic to start";
   final List<Map<String, String>> _conversationHistory = [];
@@ -175,18 +176,33 @@ class _S2SConversationPageState extends State<S2SConversationPage>
         final reply = data['reply'] ?? "";
 
         if (mounted) {
+          final bool shouldExit = data['should_exit'] ?? false;
+          
           setState(() {
             _statusText = "Speaking...";
             _conversationHistory.add({"role": "bot", "content": reply});
             _requirePrescription = data['require_prescription'] ?? false;
           });
           _scrollToBottom();
+
+          String cleanText = reply.replaceAll("**", "").replaceAll("*", "");
+          
+          // Human-like flow: Speak and then automatically listen or exit
+          await _elevenLabsService.speak(
+            cleanText, 
+            onComplete: () {
+              if (shouldExit && mounted) {
+                _stopListening();
+                _elevenLabsService.stop();
+                Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+              } else if (_isAutoMode && mounted) {
+                _startListening();
+              }
+            }
+          );
         }
 
-        String cleanText = reply.replaceAll("**", "").replaceAll("*", "");
-        await _elevenLabsService.speak(cleanText);
-
-        if (mounted) {
+        if (mounted && !_isAutoMode) {
           setState(() => _statusText = "Tap to talk again");
         }
       }
@@ -208,7 +224,7 @@ class _S2SConversationPageState extends State<S2SConversationPage>
     if (mounted) {
       setState(() {
         _isProcessing = true;
-        _statusText = "Uploading...";
+        _statusText = "Analyzing prescription...";
         _conversationHistory.add({"role": "user", "content": "Uploaded a prescription: [Image]"});
       });
       _scrollToBottom();
@@ -218,14 +234,44 @@ class _S2SConversationPageState extends State<S2SConversationPage>
       final url = await _storageService.uploadPrescription(image);
       final user = Supabase.instance.client.auth.currentUser;
 
+      // 1. First validate with PrescriptoAI
+      final validationResponse = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/validate_prescription_cart'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({
+          'user_id': user?.id ?? 'anonymous',
+          'image_url': url,
+          // We don't send cart_items here because we want general extraction/confirmation
+        }),
+      );
+
+      String aiAnalysis = "";
+      List<String> extractedMeds = [];
+      
+      if (validationResponse.statusCode == 200) {
+        final valData = json.decode(utf8.decode(validationResponse.bodyBytes));
+        if (valData['success'] == true) {
+          extractedMeds = List<String>.from(valData['extracted_medicines']);
+          final details = valData['prescription_details'];
+          aiAnalysis = "I've analyzed your prescription. It was issued by Dr. ${details['doctor'] ?? 'Unknown'} on ${details['date'] ?? 'an unknown date'}. ";
+          if (extractedMeds.isNotEmpty) {
+            aiAnalysis += "I found the following medicines: ${extractedMeds.join(', ')}. ";
+          }
+        } else {
+          aiAnalysis = "I encountered an issue analyzing the image: ${valData['error']}. ";
+        }
+      }
+
+      // 2. Send to Chat for context-aware response and ordering
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/chat'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode({
-          'message': "I have uploaded my prescription. Here is the link: $url. Please confirm my order details.",
+          'message': "AI ANALYSIS: $aiAnalysis. User uploaded prescription: $url. If valid medicines were found, please offer to add them to my cart or place an order.",
           'user_id': user?.id ?? 'anonymous',
           'language': LocalizationService.currentLanguage,
-          'image_url': url
+          'image_url': url,
+          'extracted_medicines': extractedMeds
         }),
       );
 
@@ -342,15 +388,18 @@ class _S2SConversationPageState extends State<S2SConversationPage>
                                 ),
                               )
                             : lastBotMessage.isNotEmpty
-                                ? Text(
-                                    lastBotMessage.length > 160
-                                        ? '${lastBotMessage.substring(0, 160)}...'
-                                        : lastBotMessage,
-                                    key: ValueKey('response_$lastBotMessage'),
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: PharmacoTokens.neutral600,
-                                      height: 1.5,
+                                ? Container(
+                                    constraints: BoxConstraints(maxHeight: size.height * 0.3),
+                                    child: SingleChildScrollView(
+                                      child: Text(
+                                          lastBotMessage,
+                                          key: ValueKey('response_$lastBotMessage'),
+                                          textAlign: TextAlign.center,
+                                          style: theme.textTheme.bodyLarge?.copyWith(
+                                            color: PharmacoTokens.neutral600,
+                                            height: 1.5,
+                                          ),
+                                        ),
                                     ),
                                   )
                                 : Text(
@@ -509,17 +558,49 @@ class _S2SConversationPageState extends State<S2SConversationPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Upload prescription (conditional)
-          if (_requirePrescription) ...[
-            _circleButton(Icons.file_upload_outlined, _directUploadPrescription),
-            const SizedBox(width: PharmacoTokens.space20),
-          ],
+          // Auto Mode Toggle
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isAutoMode = !_isAutoMode;
+                if (!_isAutoMode) {
+                  _stopListening();
+                  _elevenLabsService.stop();
+                }
+              });
+            },
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: _isAutoMode ? Colors.green.withOpacity(0.1) : PharmacoTokens.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _isAutoMode ? Colors.green : PharmacoTokens.neutral300,
+                  width: 2,
+                ),
+                boxShadow: PharmacoTokens.shadowZ1(),
+              ),
+              child: Icon(
+                _isAutoMode ? Icons.loop_rounded : Icons.sync_disabled_rounded,
+                color: _isAutoMode ? Colors.green : PharmacoTokens.neutral700,
+                size: 24,
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: PharmacoTokens.space20),
 
           // Main Mic
           GestureDetector(
-            onTap: _isProcessing
-                ? null
-                : (_isListening ? _stopListening : _startListening),
+            onTap: () {
+              if (_isProcessing) return;
+              if (_isListening) {
+                _stopListening();
+              } else {
+                _startListening();
+              }
+            },
             child: Container(
               width: 72,
               height: 72,
@@ -559,8 +640,15 @@ class _S2SConversationPageState extends State<S2SConversationPage>
 
           const SizedBox(width: PharmacoTokens.space20),
 
-          // Close
-          _circleButton(Icons.close_rounded, () => Navigator.pop(context)),
+          // Close or Prescription Upload
+          if (_requirePrescription)
+            _circleButton(Icons.file_upload_outlined, _directUploadPrescription)
+          else
+            _circleButton(Icons.close_rounded, () {
+              _stopListening();
+              _elevenLabsService.stop();
+              Navigator.pop(context);
+            }),
         ],
       ),
     );

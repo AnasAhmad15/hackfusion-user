@@ -32,12 +32,6 @@ class _AppTourScreenState extends State<AppTourScreen> {
       'icon': Icons.medication_rounded,
       'color': PharmacoTokens.primaryBase,
     },
-    {
-      'title': '24/7 Emergency Support',
-      'description': 'Quick access to emergency services when you need it most.',
-      'icon': Icons.emergency_rounded,
-      'color': PharmacoTokens.emergency,
-    },
   ];
 
   @override

@@ -70,6 +70,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     final now = DateTime.now();
     for (var item in _inventory) {
+      if (item['expiry_date'] == null) {
+        _criticalMedicines++; // Or handle as per business logic
+        continue;
+      }
       final expiryDate = DateTime.parse(item['expiry_date']);
       final daysLeft = expiryDate.difference(now).inDays;
       if (daysLeft <= 3) _criticalMedicines++;
@@ -196,8 +200,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildMedicineCard(Map<String, dynamic> item, ThemeData theme, bool isDark) {
-    final expiryDate = DateTime.parse(item['expiry_date']);
-    final daysLeft = expiryDate.difference(DateTime.now()).inDays;
+    final String? expiryDateStr = item['expiry_date'];
+    final expiryDate = expiryDateStr != null ? DateTime.parse(expiryDateStr) : null;
+    final daysLeft = expiryDate != null ? expiryDate.difference(DateTime.now()).inDays : -1;
     final statusColor = _getStatusColor(daysLeft);
     final statusText = _getStatusText(daysLeft);
 
@@ -233,7 +238,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         style: theme.textTheme.bodySmall?.copyWith(color: PharmacoTokens.neutral500)),
                     Text('${LocalizationService.t('Daily Usage')}: ${item['daily_usage']}',
                         style: theme.textTheme.bodySmall?.copyWith(color: PharmacoTokens.neutral500)),
-                    Text('${LocalizationService.t('Expiry')}: ${DateFormat('yyyy-MM-dd').format(expiryDate)}',
+                    Text('${LocalizationService.t('Expiry')}: ${expiryDate != null ? DateFormat('yyyy-MM-dd').format(expiryDate) : LocalizationService.t('Not Set')}',
                         style: theme.textTheme.labelSmall?.copyWith(color: PharmacoTokens.neutral500)),
                   ],
                 ),
@@ -245,7 +250,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('$daysLeft ${LocalizationService.t('Days Left')}',
+              Text(expiryDate != null ? '$daysLeft ${LocalizationService.t('Days Left')}' : LocalizationService.t('No Expiry'),
                   style: theme.textTheme.titleSmall?.copyWith(color: statusColor)),
               Row(
                 children: [
@@ -740,7 +745,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final nameController = TextEditingController(text: item['medicine_name']);
     final quantityController = TextEditingController(text: item['quantity'].toString());
     final usageController = TextEditingController(text: item['daily_usage'].toString());
-    DateTime selectedDate = DateTime.parse(item['expiry_date']);
+    DateTime selectedDate = item['expiry_date'] != null 
+        ? DateTime.parse(item['expiry_date']) 
+        : DateTime.now().add(const Duration(days: 30));
 
     showModalBottomSheet(
       context: context,

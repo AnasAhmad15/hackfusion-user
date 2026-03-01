@@ -116,48 +116,59 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
                     padding: const EdgeInsets.all(PharmacoTokens.space16),
                     child: SkeletonLayouts.cardList(),
                   )
-                : filteredMedicines.isEmpty
-                    ? EmptyState(
-                        icon: Icons.medication_outlined,
-                        title: LocalizationService.t('No medicines found'),
-                        subtitle: 'Try a different search term',
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: PharmacoTokens.space16,
-                        ),
-                        itemCount: filteredMedicines.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: PharmacoTokens.space12),
-                        itemBuilder: (context, index) {
-                          final med = filteredMedicines[index];
-                          return _MedicineListTile(
-                            medicine: med,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    MedicineDetailScreen(medicine: med),
+                : RefreshIndicator(
+                    onRefresh: _loadData,
+                    color: PharmacoTokens.primaryBase,
+                    child: filteredMedicines.isEmpty
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.6,
+                              child: EmptyState(
+                                icon: Icons.medication_outlined,
+                                title: LocalizationService.t('No medicines found'),
+                                subtitle: 'Try a different search term',
                               ),
-                            ).then((_) => setState(() {})),
-                            onAddToCart: () async {
-                              await _cartService.addToCart(med);
-                              if (mounted) {
-                                setState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '${med.name} ${LocalizationService.t('added to cart')}',
-                                    ),
-                                    duration: const Duration(seconds: 1),
-                                    behavior: SnackBarBehavior.floating,
+                            ),
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: PharmacoTokens.space16,
+                            ),
+                            itemCount: filteredMedicines.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: PharmacoTokens.space12),
+                            itemBuilder: (context, index) {
+                              final med = filteredMedicines[index];
+                              return _MedicineListTile(
+                                medicine: med,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        MedicineDetailScreen(medicine: med),
                                   ),
-                                );
-                              }
+                                ).then((_) => setState(() {})),
+                                onAddToCart: () async {
+                                  await _cartService.addToCart(med);
+                                  if (mounted) {
+                                    setState(() {});
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${med.name} ${LocalizationService.t('added to cart')}',
+                                        ),
+                                        duration: const Duration(seconds: 1),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                },
+                              );
                             },
-                          );
-                        },
-                      ),
+                          ),
+                  ),
           ),
         ],
       ),

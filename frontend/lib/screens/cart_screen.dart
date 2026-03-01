@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,8 +34,6 @@ class _CartScreenState extends State<CartScreen> {
   bool _isProcessing = false;
   double _walletBalance = 0.0;
   Map<String, dynamic>? _profileData;
-  String? _uploadedPrescriptionUrl;
-  bool _isUploadingPrescription = false;
 
   @override
   void initState() {
@@ -42,6 +43,31 @@ class _CartScreenState extends State<CartScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    // Listen to changes in CartService (which now handles prescription state)
+    _cartService.addListener(_onCartChanged);
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _cartService.removeListener(_onCartChanged);
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    _processCheckout('razorpay', referenceId: response.paymentId);
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment Failed: ${response.message}')));
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('External Wallet: ${response.walletName}')));
   }
 
   Future<void> _loadData() async {
@@ -84,40 +110,39 @@ class _CartScreenState extends State<CartScreen> {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
-    setState(() => _isUploadingPrescription = true);
     try {
       final url = await _storageService.uploadPrescription(image);
-      setState(() => _uploadedPrescriptionUrl = url);
+      await _cartService.setPrescriptionUrl(url);
+      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Prescription uploaded successfully'), behavior: SnackBarBehavior.floating),
-        );
+        if (_cartService.validationError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_cartService.validationError!),
+              backgroundColor: PharmacoTokens.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Prescription uploaded and validated!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: PharmacoTokens.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-    } finally {
-      setState(() => _isUploadingPrescription = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _razorpay.clear();
-    super.dispose();
-  }
-
-  void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    _processCheckout('razorpay', referenceId: response.paymentId);
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment Failed: ${response.message}')));
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('External Wallet: ${response.walletName}')));
   }
 
   @override
@@ -181,7 +206,13 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildCheckoutSection(ThemeData theme, bool isDark) {
     final bool requiresPrescription = _cartService.requiresPrescription;
-    final bool canCheckout = !requiresPrescription || _uploadedPrescriptionUrl != null;
+    final bool allValidated = requiresPrescription 
+        ? (_cartService.prescriptionUrl != null && 
+           _cartService.missingMedicines.isEmpty && 
+           !_cartService.isValidating && 
+           _cartService.validationError == null)
+        : true;
+    final bool canCheckout = allValidated;
     final double serviceFee = _cartService.totalCost * 0.02;
     final double deliveryFee = 40.0;
     final double totalAmount = _cartService.totalCost + serviceFee + deliveryFee;
@@ -202,45 +233,98 @@ class _CartScreenState extends State<CartScreen> {
               Container(
                 padding: const EdgeInsets.all(PharmacoTokens.space12),
                 decoration: BoxDecoration(
-                  color: _uploadedPrescriptionUrl != null
+                  color: allValidated
                       ? PharmacoTokens.successLight
-                      : PharmacoTokens.warningLight,
+                      : (_cartService.validationError != null || _cartService.missingMedicines.isNotEmpty 
+                          ? PharmacoTokens.errorLight 
+                          : PharmacoTokens.warningLight),
                   borderRadius: PharmacoTokens.borderRadiusMedium,
+                  border: Border.all(
+                    color: allValidated
+                        ? PharmacoTokens.success.withValues(alpha: 0.3)
+                        : (_cartService.validationError != null || _cartService.missingMedicines.isNotEmpty 
+                            ? PharmacoTokens.error.withValues(alpha: 0.3) 
+                            : PharmacoTokens.warning.withValues(alpha: 0.3)),
+                  ),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Icon(
-                      _uploadedPrescriptionUrl != null
-                          ? Icons.check_circle_rounded
-                          : Icons.warning_amber_rounded,
-                      color: _uploadedPrescriptionUrl != null
-                          ? PharmacoTokens.success
-                          : PharmacoTokens.warning,
-                    ),
-                    const SizedBox(width: PharmacoTokens.space12),
-                    Expanded(
-                      child: Text(
-                        _uploadedPrescriptionUrl != null
-                            ? 'Prescription uploaded!'
-                            : 'Items require a prescription',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: PharmacoTokens.weightMedium,
-                          color: _uploadedPrescriptionUrl != null
-                              ? PharmacoTokens.success
-                              : PharmacoTokens.warning,
+                    Row(
+                      children: [
+                        if (_cartService.isValidating)
+                          const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(PharmacoTokens.primaryBase)),
+                          )
+                        else
+                          Icon(
+                            allValidated
+                                ? Icons.check_circle_rounded
+                                : (_cartService.validationError != null || _cartService.missingMedicines.isNotEmpty 
+                                    ? Icons.error_outline_rounded 
+                                    : Icons.warning_amber_rounded),
+                            color: allValidated
+                                ? PharmacoTokens.success
+                                : (_cartService.validationError != null || _cartService.missingMedicines.isNotEmpty 
+                                    ? PharmacoTokens.error 
+                                    : PharmacoTokens.warning),
+                          ),
+                        const SizedBox(width: PharmacoTokens.space12),
+                        Expanded(
+                          child: Text(
+                            _cartService.isValidating
+                                ? 'Analyzing prescription...'
+                                : (_cartService.validationError != null
+                                    ? _cartService.validationError!
+                                    : (allValidated
+                                        ? 'Prescription validated for all items!'
+                                        : (_cartService.missingMedicines.isNotEmpty 
+                                            ? 'Prescription missing: ${_cartService.missingMedicines.join(", ")}'
+                                            : 'Items require a prescription'))),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: PharmacoTokens.weightMedium,
+                              color: allValidated
+                                  ? PharmacoTokens.success
+                                  : (_cartService.validationError != null || _cartService.missingMedicines.isNotEmpty 
+                                      ? PharmacoTokens.error 
+                                      : PharmacoTokens.warning),
+                            ),
+                          ),
                         ),
-                      ),
+                        if (_cartService.prescriptionUrl == null || _cartService.missingMedicines.isNotEmpty || _cartService.validationError != null)
+                          TextButton(
+                            onPressed: _cartService.isValidating ? null : _uploadPrescription,
+                            child: _cartService.isValidating
+                                ? const SizedBox(
+                                    width: 16, height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Text(_cartService.prescriptionUrl == null ? 'Upload' : 'Retry Scan'),
+                          ),
+                      ],
                     ),
-                    if (_uploadedPrescriptionUrl == null)
-                      TextButton(
-                        onPressed: _isUploadingPrescription ? null : _uploadPrescription,
-                        child: _isUploadingPrescription
-                            ? const SizedBox(
-                                width: 16, height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Upload'),
+                    if (_cartService.prescriptionDetails != null && allValidated) ...[
+                      const SizedBox(height: 8),
+                      const Divider(height: 1),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.person_outline, size: 14, color: PharmacoTokens.success.withValues(alpha: 0.7)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Dr. ${_cartService.prescriptionDetails!['doctor'] ?? 'Unknown'}',
+                            style: theme.textTheme.labelSmall?.copyWith(color: PharmacoTokens.success),
+                          ),
+                          const Spacer(),
+                          Icon(Icons.calendar_today_outlined, size: 14, color: PharmacoTokens.success.withValues(alpha: 0.7)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_cartService.prescriptionDetails!['date'] ?? 'N/A'}',
+                            style: theme.textTheme.labelSmall?.copyWith(color: PharmacoTokens.success),
+                          ),
+                        ],
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -365,7 +449,7 @@ class _CartScreenState extends State<CartScreen> {
             _buildInfoRow(LocalizationService.t('Patient Name'), _profileData?['full_name'] ?? 'N/A', theme),
             _buildInfoRow(LocalizationService.t('Delivery Address'), _profileData?['address'] ?? 'N/A', theme),
             _buildInfoRow(LocalizationService.t('Payment Method'), method.toUpperCase(), theme),
-            if (_uploadedPrescriptionUrl != null)
+            if (_cartService.prescriptionUrl != null)
               _buildInfoRow('Prescription', 'Uploaded ✅', theme),
             const Divider(height: PharmacoTokens.space24),
             ..._cartService.items.map((item) => Padding(
@@ -485,7 +569,7 @@ class _CartScreenState extends State<CartScreen> {
           'delivery_fee': deliveryFee,
           'total_tax': 0.0,
           'type': 'order',
-          'prescription_url': _uploadedPrescriptionUrl,
+          'prescription_url': _cartService.prescriptionUrl,
           'items': _cartService.items.map((item) {
             return {
               'medicine_id': int.parse(item.medicine.id.toString()),

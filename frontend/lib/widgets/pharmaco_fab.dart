@@ -14,7 +14,6 @@ class PharmacoFab extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
   final String? tooltip;
-  final bool isEmergency;
   final bool mini;
 
   const PharmacoFab({
@@ -22,7 +21,6 @@ class PharmacoFab extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.tooltip,
-    this.isEmergency = false,
     this.mini = false,
   });
 
@@ -32,16 +30,6 @@ class PharmacoFab extends StatelessWidget {
     required this.onPressed,
     this.tooltip = 'Ask AI',
   })  : icon = Icons.auto_awesome_rounded,
-        isEmergency = false,
-        mini = false;
-
-  /// Convenience: emergency FAB (red).
-  const PharmacoFab.emergency({
-    super.key,
-    required this.onPressed,
-    this.tooltip = 'Emergency',
-  })  : icon = Icons.emergency_rounded,
-        isEmergency = true,
         mini = false;
 
   @override
@@ -54,10 +42,8 @@ class PharmacoFab extends StatelessWidget {
       child: FloatingActionButton(
         onPressed: onPressed,
         tooltip: tooltip,
-        heroTag: isEmergency ? 'emergency_fab' : 'pharmaco_fab',
-        backgroundColor: isEmergency
-            ? PharmacoTokens.emergency
-            : PharmacoTokens.primaryBase,
+        heroTag: 'pharmaco_fab',
+        backgroundColor: PharmacoTokens.primaryBase,
         foregroundColor: PharmacoTokens.white,
         elevation: PharmacoTokens.elevationZ1,
         highlightElevation: PharmacoTokens.elevationZ2,

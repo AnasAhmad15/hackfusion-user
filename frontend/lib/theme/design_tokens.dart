@@ -65,10 +65,6 @@ class PharmacoTokens {
   static const Color darkSurfaceElevated = Color(0xFF1A2942);
   static const Color darkBorder = Color(0xFF2A3A52);
 
-  // Emergency
-  static const Color emergency = Color(0xFFDC2626);
-  static const Color emergencyBg = Color(0xFFFEF2F2);
-
   // ──────────────────────────────────────────
   //  SPACING TOKENS (base = 8)
   // ──────────────────────────────────────────

@@ -56,7 +56,6 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
         'Home': LocalizationService.t('Home'),
         'Medicines': LocalizationService.t('Medicines'),
         'AI Chat': LocalizationService.t('AI Chat'),
-        'Emergency': LocalizationService.t('Emergency'),
         'Profile': LocalizationService.t('Profile'),
       };
     });
@@ -89,11 +88,6 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
         index: _selectedIndex,
         children: _pages,
       ),
-      floatingActionButton: _selectedIndex == 0
-          ? PharmacoFab.emergency(
-              onPressed: () => Navigator.pushNamed(context, '/emergency-mode'),
-            )
-          : null,
       bottomNavigationBar: PharmacoBottomNav(
         currentIndex: _selectedIndex,
         onTap: _onTabTap,
